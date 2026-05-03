@@ -1,75 +1,212 @@
-🎨 Athena Frontend — AI Search Interface
+# 🎨 Athena Frontend — AI Search Interface
 
-Athena Frontend is a modern, minimal UI for interacting with the Athena AI backend. It is designed to behave like a Perplexity-style search interface, focusing on clarity, speed, and structured responses.
+Athena Frontend is a modern, minimal user interface for interacting with the Athena AI backend. It is designed to deliver a **Perplexity-style experience** — fast search, clean answers, and intuitive follow-ups.
 
-🚀 Features
-🔍 Clean search interface
-⚡ Fast query submission
-🧠 Displays structured AI responses (XML → UI)
-🔁 Follow-up question interaction
-💬 Conversation-based UI (WIP)
-🌙 Modern dark theme (inspired by Apple/Perplexity)
-📱 Responsive design
-🏗️ Architecture
+---
+
+## 🚀 Features
+
+* 🔍 **Search-first UI** — ask anything instantly
+* 🧠 **Structured Answer Rendering** (XML → UI)
+* 🔁 **Follow-up Questions** for deeper exploration
+* 💬 **Chat-like Experience** (planned)
+* 🌙 **Modern Dark Theme** (clean, minimal design)
+* 📱 **Responsive Layout** (desktop + mobile)
+
+---
+
+## 🏗️ Architecture
+
+```id="fe-arch"
 User Input
    ↓
-API Call → /ask-Athena
+API Request → Backend (/ask-Athena)
    ↓
 Receive XML Response
    ↓
 Parse XML → JSON
    ↓
 Render Answer + Follow-ups
-📁 Project Structure
+```
+
+---
+
+## 📁 Project Structure
+
+```id="fe-structure"
 .
-├── components/        # UI components
-├── pages/             # Routes / views
-├── services/          # API calls
-├── utils/             # XML parsing, helpers
-├── styles/            # Theme & design
+├── components/        # Reusable UI components
+├── pages/             # Main views / routes
+├── services/          # API calls (fetch/axios)
+├── utils/             # XML parsing helpers
+├── hooks/             # Custom React hooks
+├── styles/            # Tailwind / global styles
 └── README.md
-⚙️ Tech Stack
-Framework: React / Next.js (recommended)
-Styling: Tailwind CSS
-State: React hooks / Zustand (optional)
-API: Fetch / Axios
-🔧 Setup
+```
+
+---
+
+## ⚙️ Tech Stack
+
+* **Framework:** React / Next.js
+* **Styling:** Tailwind CSS
+* **State Management:** React Hooks / Zustand (optional)
+* **API Handling:** Fetch / Axios
+
+---
+
+## 🔧 Setup Instructions
+
+### 1. Install dependencies
+
+```bash id="fe-install"
 npm install
+```
+
+---
+
+### 2. Run development server
+
+```bash id="fe-run"
 npm run dev
-📡 API Integration
-Main Endpoint
+```
+
+App will run at:
+
+```id="fe-url"
+http://localhost:3000
+```
+
+---
+
+## 📡 API Integration
+
+### Endpoint
+
+```id="fe-endpoint"
 POST /ask-Athena
-Example Call
-const res = await fetch("/ask-Athena", {
+```
+
+---
+
+### Example Request
+
+```ts id="fe-api"
+const response = await fetch("http://localhost:3000/ask-Athena", {
   method: "POST",
-  body: JSON.stringify({ query }),
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    query: "What is artificial intelligence?",
+  }),
 });
-🧠 Response Handling
 
-Backend returns XML:
+const data = await response.json();
+```
 
-<ANSWER>...</ANSWER>
+---
+
+## 🧠 Handling Backend Response
+
+The backend returns **XML**, not JSON:
+
+```xml id="fe-xml"
+<ANSWER>
+AI is the simulation of human intelligence...
+</ANSWER>
+
 <FOLLOW_UPS>
-  <QUESTION>...</QUESTION>
+  <QUESTION>What are types of AI?</QUESTION>
+  <QUESTION>How is AI used today?</QUESTION>
+  <QUESTION>What are risks of AI?</QUESTION>
 </FOLLOW_UPS>
+```
 
-Frontend must:
+---
 
-Parse XML
-Extract:
-Answer
-Follow-up questions
-⚠️ Limitations
-No streaming yet
-No authentication UI
-No persistent chat memory
-Basic error states
-🔮 Future Improvements
-💬 Chat history UI
-⚡ Streaming responses (typing effect)
-🧾 Source citations UI
-🔐 Auth pages (signup/signin)
-📊 Query history dashboard
-🎯 Goal
+### 🔄 Convert XML → UI Data
 
-Provide a simple, fast, and elegant interface for interacting with Athena AI.
+You should:
+
+1. Extract `<ANSWER>`
+2. Extract all `<QUESTION>` tags
+3. Store them in state
+
+---
+
+### Example Parsing (Basic)
+
+```ts id="fe-parse"
+function parseXML(xml: string) {
+  const answer = xml.match(/<ANSWER>([\s\S]*?)<\/ANSWER>/)?.[1];
+  const questions = [...xml.matchAll(/<QUESTION>(.*?)<\/QUESTION>/g)].map(
+    (q) => q[1]
+  );
+
+  return { answer, questions };
+}
+```
+
+---
+
+## 🎯 Core Responsibilities
+
+Frontend is responsible for:
+
+* Sending user queries
+* Rendering structured responses
+* Handling UI/UX interactions
+* Managing client-side state
+* Displaying follow-up suggestions
+
+---
+
+## ⚠️ Limitations
+
+* No streaming (responses appear all at once)
+* No authentication UI yet
+* No persistent chat history
+* Basic error handling
+
+---
+
+## 🔮 Future Improvements
+
+* ⚡ Streaming responses (typing effect)
+* 💬 Full chat UI with history
+* 🧾 Source citations (like Perplexity)
+* 🔐 Authentication pages (signup/signin)
+* 📊 User dashboard (query history)
+* 🎨 Advanced UI animations
+
+---
+
+## 🧪 Example Flow
+
+1. User enters a query
+2. Frontend sends request to backend
+3. Receives XML response
+4. Parses XML
+5. Displays answer + follow-ups
+
+---
+
+## 🎨 Design Philosophy
+
+* Minimal
+* Fast
+* Distraction-free
+* Content-focused
+
+---
+
+## 👨‍💻 Author
+
+Built with 🚀 by you.
+
+---
+
+## 📄 License
+
+MIT
