@@ -5,6 +5,7 @@ import { z } from "zod";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt";
+import { prisma } from "./db";
 
 dotenv.config();
 
