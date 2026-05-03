@@ -1,20 +1,20 @@
 # 🧠 Athena — AI Search Assistant (Perplexity-style)
 
-Athena is a context-aware AI assistant that combines **real-time web search** with **LLM reasoning** to generate structured, reliable answers — inspired by tools like Perplexity.
-
-It retrieves live data, processes it through a language model, and returns responses in a **strict XML format** for easy frontend parsing.
+Athena is a context-aware AI backend that combines **real-time web search** with **LLM reasoning** to generate structured, reliable answers. It is designed to behave like a simplified version of Perplexity, with extensibility for conversations, memory, and intelligent query handling.
 
 ---
 
 ## 🚀 Features
 
-* 🔍 **Real-time Web Search** (via Tavily)
-* 🧠 **LLM-Powered Answers** (via OpenRouter)
-* 📦 **Structured Output (XML)** for predictable parsing
-* 🛡️ **Input Validation** using Zod
-* ⚡ **Optimized Context Handling** (token-safe)
-* 🎯 **Follow-up Question Generation**
-* 🧼 **Response Guardrails & Fallback Handling**
+* 🔍 Real-time web search (Tavily)
+* 🧠 LLM-powered answers (OpenRouter)
+* 📦 Structured XML output (easy frontend parsing)
+* 🛡️ Input validation (Zod)
+* ⚡ Optimized context trimming (token-efficient)
+* 🎯 Follow-up question generation
+* 🧼 Response fallback handling
+* 🗄️ Database integration (Prisma)
+* 💬 Conversation system (WIP)
 
 ---
 
@@ -23,9 +23,9 @@ It retrieves live data, processes it through a language model, and returns respo
 ```
 User Query
    ↓
-Tavily Search API (fetch context)
+Tavily Search API
    ↓
-Context Filtering & Trimming
+Context Filtering (formatContext)
    ↓
 Prompt Construction
    ↓
@@ -33,7 +33,7 @@ LLM (OpenRouter)
    ↓
 Structured XML Response
    ↓
-Frontend Rendering
+Frontend Rendering / Storage
 ```
 
 ---
@@ -42,8 +42,10 @@ Frontend Rendering
 
 ```
 .
-├── index.ts        # Main server logic
-├── prompt.ts       # System prompt + template
+├── index.ts            # Main server + routes
+├── prompt.ts           # System + template prompts
+├── db/                 # Prisma setup
+├── prisma/             # Schema & migrations
 ├── package.json
 └── README.md
 ```
@@ -54,24 +56,16 @@ Frontend Rendering
 
 * **Backend:** Node.js + Express
 * **Validation:** Zod
-* **Search API:** Tavily
-* **LLM Provider:** OpenRouter
-* **Language Model:** LLaMA 3 (or Mixtral)
+* **Search:** Tavily API
+* **LLM:** OpenRouter (LLaMA 3 / Mixtral)
+* **Database:** PostgreSQL (Supabase)
+* **ORM:** Prisma
 
 ---
 
 ## 🔧 Setup Instructions
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/athena.git
-cd athena
-```
-
----
-
-### 2. Install dependencies
+### 1. Install dependencies
 
 ```bash
 npm install
@@ -79,41 +73,45 @@ npm install
 
 ---
 
-### 3. Environment Variables
+### 2. Environment Variables
 
-Create a `.env` file:
+Create `.env`:
 
 ```env
 PORT=3000
 OPEN_ROUTER_API=your_openrouter_api_key
 API_KEY=your_tavily_api_key
+DATABASE_URL=your_database_url
 ```
 
 ---
 
-### 4. Run the server
+### 3. Prisma Setup
 
 ```bash
-npm run dev
-```
-
-Server will start at:
-
-```
-http://localhost:3000
+npx prisma generate
+npx prisma migrate dev
 ```
 
 ---
 
-## 📡 API Usage
+### 4. Run Server
 
-### Endpoint
-
-```
-POST /ask-Athena
+```bash
+npx ts-node index.ts
 ```
 
-### Request Body
+---
+
+## 📡 API Routes
+
+### 🧠 Core AI
+
+#### `POST /ask-Athena`
+
+Main query endpoint.
+
+**Request:**
 
 ```json
 {
@@ -121,80 +119,151 @@ POST /ask-Athena
 }
 ```
 
----
-
-### Response Format (XML)
+**Response:**
 
 ```xml
 <ANSWER>
-Artificial Intelligence (AI) refers to the simulation of human intelligence in machines...
+AI is the simulation of human intelligence...
 </ANSWER>
 
 <FOLLOW_UPS>
-  <QUESTION>What are the types of AI?</QUESTION>
-  <QUESTION>How is AI used in real-world applications?</QUESTION>
-  <QUESTION>What are the risks of AI?</QUESTION>
+  <QUESTION>What are types of AI?</QUESTION>
+  <QUESTION>How is AI used today?</QUESTION>
+  <QUESTION>What are AI risks?</QUESTION>
 </FOLLOW_UPS>
 ```
 
 ---
 
-## 🧠 Prompt Design
+### 🔄 Follow-up Queries (WIP)
 
-Athena uses a strict system prompt:
+#### `POST /ask-Athena/follow-on`
 
-* Forces **context-only answering**
-* Prevents hallucination
-* Enforces **XML structure**
-* Generates follow-up questions
+Planned:
+
+* Fetch previous conversation
+* Send full history to LLM
+* Generate contextual response
+* Stream output
+
+---
+
+### 👤 Auth (Planned)
+
+#### `POST /signup`
+
+* Create new user
+
+#### `POST /signin`
+
+* Authenticate user
+
+---
+
+### 💬 Conversations (Planned)
+
+#### `GET /Athena/convresations`
+
+* Fetch user conversations
+
+#### `POST /Athena/conversation/:id`
+
+* Add message to a conversation
+
+---
+
+## 🧠 Core Logic
+
+### Context Optimization
+
+```ts
+function formatContext(results: any[]) {
+  return results
+    .slice(0, 5)
+    .map((r) => ({
+      title: r.title,
+      content: r.content?.slice(0, 500),
+      url: r.url,
+    }));
+}
+```
+
+👉 Reduces token usage and improves answer quality.
+
+---
+
+### Prompt Flow
+
+1. Inject search results into template
+2. Add strict system prompt
+3. Force XML output
+4. Send to LLM
+
+---
+
+### Output Guard
+
+If LLM breaks format:
+
+```xml
+<ANSWER>
+Fallback response triggered.
+</ANSWER>
+```
 
 ---
 
 ## ⚠️ Limitations
 
-* Depends on quality of search results
-* XML output may occasionally break (handled with fallback)
-* No streaming (yet)
-* No conversation memory (stateless)
+* No streaming yet
+* No memory (stateless queries)
+* XML format may break occasionally
+* No ranking of search results
+* Basic error handling
 
 ---
 
 ## 🔮 Future Improvements
 
 * 🔄 Streaming responses (SSE)
-* 🧾 Citation system (like Perplexity)
+* 🧾 Source citations (Perplexity-style)
 * 🧠 Conversation memory
 * 📊 Result reranking
-* 🛡️ Prompt injection protection
-* 🌐 Multi-model routing
+* 🛡️ Prompt injection defense
+* 💳 Credit system per user
+* ⚡ Response caching (same query reuse)
+* 🔍 Semantic search (vector DB)
 
 ---
 
 ## 🧪 Example Flow
 
-1. User asks: *"Best programming language to learn?"*
+1. User sends query
 2. Athena fetches web results
-3. Filters & trims context
-4. Sends to LLM with strict prompt
-5. Returns structured XML answer + follow-ups
+3. Filters + trims context
+4. Sends to LLM
+5. Returns structured XML
 
 ---
 
-## 🤝 Contributing
+## 💥 Current Status
 
-Pull requests are welcome. For major changes, open an issue first.
+Athena is at:
+
+> **v1 — functional AI search backend**
+
+Not yet:
+
+> full Perplexity-level system (missing memory, ranking, citations)
+
+---
+
+## 👨‍💻 Author
+
+Built by divi
 
 ---
 
 ## 📄 License
 
-MIT License
-
----
-
-## ✨ Inspiration
-
-Inspired by modern AI search tools like Perplexity, but designed for full customization and control.
-
----
-
+MIT

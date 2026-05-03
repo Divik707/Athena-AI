@@ -1,21 +1,75 @@
-# bun-react-tailwind-template
+🎨 Athena Frontend — AI Search Interface
 
-To install dependencies:
+Athena Frontend is a modern, minimal UI for interacting with the Athena AI backend. It is designed to behave like a Perplexity-style search interface, focusing on clarity, speed, and structured responses.
 
-```bash
-bun install
-```
+🚀 Features
+🔍 Clean search interface
+⚡ Fast query submission
+🧠 Displays structured AI responses (XML → UI)
+🔁 Follow-up question interaction
+💬 Conversation-based UI (WIP)
+🌙 Modern dark theme (inspired by Apple/Perplexity)
+📱 Responsive design
+🏗️ Architecture
+User Input
+   ↓
+API Call → /ask-Athena
+   ↓
+Receive XML Response
+   ↓
+Parse XML → JSON
+   ↓
+Render Answer + Follow-ups
+📁 Project Structure
+.
+├── components/        # UI components
+├── pages/             # Routes / views
+├── services/          # API calls
+├── utils/             # XML parsing, helpers
+├── styles/            # Theme & design
+└── README.md
+⚙️ Tech Stack
+Framework: React / Next.js (recommended)
+Styling: Tailwind CSS
+State: React hooks / Zustand (optional)
+API: Fetch / Axios
+🔧 Setup
+npm install
+npm run dev
+📡 API Integration
+Main Endpoint
+POST /ask-Athena
+Example Call
+const res = await fetch("/ask-Athena", {
+  method: "POST",
+  body: JSON.stringify({ query }),
+});
+🧠 Response Handling
 
-To start a development server:
+Backend returns XML:
 
-```bash
-bun dev
-```
+<ANSWER>...</ANSWER>
+<FOLLOW_UPS>
+  <QUESTION>...</QUESTION>
+</FOLLOW_UPS>
 
-To run for production:
+Frontend must:
 
-```bash
-bun start
-```
+Parse XML
+Extract:
+Answer
+Follow-up questions
+⚠️ Limitations
+No streaming yet
+No authentication UI
+No persistent chat memory
+Basic error states
+🔮 Future Improvements
+💬 Chat history UI
+⚡ Streaming responses (typing effect)
+🧾 Source citations UI
+🔐 Auth pages (signup/signin)
+📊 Query history dashboard
+🎯 Goal
 
-This project was created using `bun init` in bun v1.2.17. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Provide a simple, fast, and elegant interface for interacting with Athena AI.
