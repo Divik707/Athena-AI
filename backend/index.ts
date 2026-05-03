@@ -37,6 +37,22 @@ function formatContext(results: any[]) {
     }));
 }
 
+app.post('/signup', async(req, res) => {
+  
+})
+
+app.post('/signin', async(req, res) => {
+  
+})
+
+app.get('/Athena/convresations', async(req, res) => {
+  
+})
+
+app.post('/Athena/conversation/:id', async(req, res) => {
+  
+})
+
 app.post("/ask-Athena", async (req: Request, res: Response) => {
   try {
     const convo = userInputQuery.safeParse(req.body);
@@ -49,6 +65,9 @@ app.post("/ask-Athena", async (req: Request, res: Response) => {
     }
 
     const query = convo.data.query;
+    // see if same query has been asked indexed db -> figure out
+
+    // check the credit of the present user -> if not handle that route
 
     let web_results: any = [];
     try {
@@ -99,7 +118,6 @@ The model failed to generate a structured response. Please try rephrasing your q
 </FOLLOW_UPS>
       `.trim();
     }
-
     res.json({
       data: finalOutput,
       context_used: web_results.length,
@@ -113,6 +131,13 @@ The model failed to generate a structured response. Please try rephrasing your q
     });
   }
 });
+
+app.post('/ask-Athena/follow-on', async(req, res) => {
+  // get existing chat from db
+  // forward the full history to llm
+  // do context engenering
+  // stream the response to user
+})
 
 app.listen(port, () => {
   console.log(` Athena is live at http://localhost:${port}`);
