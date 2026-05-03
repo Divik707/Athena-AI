@@ -1,15 +1,21 @@
-# backend
+# Athena — AI Search Assistant (Perplexity-style)
 
-To install dependencies:
+Athena is a context-aware AI assistant that combines **real-time web search** with **LLM reasoning** to generate structured, reliable answers — inspired by tools like Perplexity.
 
-```bash
-bun install
-```
+It retrieves live data, processes it through a language model, and returns responses in a **strict XML format** for easy frontend parsing.
 
-To run:
+---
 
-```bash
-bun run index.ts
-```
+## Features
 
-This project was created using `bun init` in bun v1.2.17. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+- 🔍 **Real-time Web Search** (via Tavily)
+- 🧠 **LLM-Powered Answers** (via OpenRouter)
+- 📦 **Structured Output (XML)** for predictable parsing
+- 🛡️ **Input Validation** using Zod
+- ⚡ **Optimized Context Handling** (token-safe)
+- 🎯 **Follow-up Question Generation**
+- 🧼 **Response Guardrails & Fallback Handling**
+
+---
+
+## 🏗️ Architecture
