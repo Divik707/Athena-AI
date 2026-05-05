@@ -1,3 +1,4 @@
+import React from 'react';
 import { createClient, User } from '@supabase/supabase-js'
 import { VITE_SUPABASE_PUBLISHABLE_KEY, VITE_SUPABASE_URL } from '@/config';
 import { useEffect, useState } from 'react';
@@ -20,11 +21,15 @@ export const Conversation = () => {
     }
     conversations();
   }, [])
+
+  const logout = () => {
+    superbase.auth.signOut();
+    setUser(null);
+    naviagte('/')
+  }
   return (
     <div>
-      {!user?.email ? <button onClick={() => naviagte('/auth')}>
-        sign up
-      </button> : user?.email}
+      {!user?.email ? <button onClick={() => naviagte('/auth')}>login</button> : <div>{user.email} <button onClick={() => logout()}>logout</button></div>}
     </div>
   )
 }

@@ -15,12 +15,7 @@ const Auth = () => {
             redirectTo: "http://localhost:3000/conversation"
         }
     })
-    if(error) {
-        alert("error while login")
-    } else {
-        alert("user login")
-    }
-    }
+}
 
     useEffect(() => {
         async function handleSession() {
