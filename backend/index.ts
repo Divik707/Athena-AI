@@ -38,14 +38,6 @@ function formatContext(results: any[]) {
     }));
 }
 
-app.post('/signup', async(req, res) => {
-  
-})
-
-app.post('/signin', async(req, res) => {
-  
-})
-
 app.get('/Athena/convresations', async(req, res) => {
   
 })
