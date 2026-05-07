@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
+    "axios": "^1.16.0",
     "bun-plugin-tailwind": "^0.0.14",
     "react": "^19",
     "react-dom": "^19",
