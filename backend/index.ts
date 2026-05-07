@@ -6,6 +6,8 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt";
 import { prisma } from "./db";
+import middleware from "./utils/middleware";
+import cors from "cors";
 
 dotenv.config();
 
@@ -14,9 +16,17 @@ if (!process.env.PORT || !process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
 }
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 app.use(express.json());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 const clientTavily = tavily({ apiKey: process.env.API_KEY });
 const clientOpenRouter = new OpenAI({
@@ -25,7 +35,7 @@ const clientOpenRouter = new OpenAI({
 });
 
 const userInputQuery = z.object({
-  query: z.string().min(2).max(200),
+  query: z.string().min(2).max(200, {message: "under 200 words"}),
 });
 
 function formatContext(results: any[]) {
@@ -38,15 +48,113 @@ function formatContext(results: any[]) {
     }));
 }
 
-app.get('/Athena/convresations', async(req, res) => {
-  
+app.get('/Athena/conversations', middleware, async(req, res) => {
+  try {
+    const superbaseId = req.userId;
+  if(!superbaseId)  {
+    res.json({
+      message: "superBaseId not found"
+    })
+  }
+  else {
+    const user = await prisma.users.findFirst({
+      where: {
+        superbaseId
+      }
+    })
+    if(!user) {
+      res.json({
+        message: "user not found with the superbaseId"
+      })
+    }
+    const conversation = await prisma.conversation.findMany({
+      where: {
+        userId: user?.id,
+      },
+      include: {
+        messages: {
+          take: 1,
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
+      },
+      orderBy: {
+        id: "desc"
+      }
+    })
+    res.json({
+      conversation
+    })
+  } 
+  } catch (error) {
+    res.json({
+      message: error
+    })
+  }
 })
 
-app.post('/Athena/conversation/:id', async(req, res) => {
-  
-})
+app.get("/Athena/conversation/:id", middleware, async (req, res) => {
+  try {
 
-app.post("/ask-Athena", async (req: Request, res: Response) => {
+    const conversationId = req.params.id;
+    const supabaseId = req.userId;
+
+    if (!supabaseId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await prisma.users.findFirst({
+      where: {
+        superbaseId: supabaseId,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    // find conversation
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        userId: user.id
+      },
+
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        message: "Conversation not found",
+      });
+    }
+
+    return res.status(200).json({
+      conversation,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+});
+
+app.post("/ask-Athena", middleware,  async (req: Request, res: Response) => {
   try {
     const convo = userInputQuery.safeParse(req.body);
 
@@ -58,9 +166,6 @@ app.post("/ask-Athena", async (req: Request, res: Response) => {
     }
 
     const query = convo.data.query;
-    // see if same query has been asked indexed db -> figure out
-
-    // check the credit of the present user -> if not handle that route
 
     let web_results: any = [];
     try {
@@ -125,12 +230,120 @@ The model failed to generate a structured response. Please try rephrasing your q
   }
 });
 
-app.post('/ask-Athena/follow-on', async(req, res) => {
-  // get existing chat from db
-  // forward the full history to llm
-  // do context engenering
-  // stream the response to user
-})
+const followOnSchema = z.object({
+  query: z.string().min(1),
+  conversationId: z.string(),
+});
+
+app.post("/ask-Athena/follow-on", middleware, async (req, res) => {
+  try {
+
+    const parsed = followOnSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid input",
+      });
+    }
+    const { query, conversationId } = parsed.data;
+
+    const supabaseId = req.userId;
+
+    if (!supabaseId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const currentUser = await prisma.users.findFirst({
+      where: {
+        superbaseId: supabaseId,
+      },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        userId: currentUser.id,
+      },
+
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        message: "Conversation not found",
+      });
+    }
+
+    const history = conversation.messages.map((msg) => ({
+      role: msg.role === "User" ? "user" : "assistant",
+      content: msg.content,
+    }));
+
+    history.push({
+      role: "user",
+      content: query,
+    });
+
+    const llmResponse = await clientOpenRouter.chat.completions.create({
+      model: "meta-llama/llama-3-8b-instruct",
+
+      temperature: 0.3,
+
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+      ],
+    });
+
+    const answer =
+      llmResponse.choices[0]?.message?.content ||
+      "No response generated.";
+
+    await prisma.messages.create({
+      data: {
+        content: query,
+        role: "User",
+        conversationId: conversation.id,
+      },
+    });
+
+    await prisma.messages.create({
+      data: {
+        content: answer,
+        role: "Assistant",
+        conversationId: conversation.id,
+      },
+    });
+
+    return res.status(200).json({
+      answer,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+});
 
 app.listen(port, () => {
   console.log(` Athena is live at http://localhost:${port}`);
