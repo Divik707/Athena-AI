@@ -19,14 +19,12 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(express.json());
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+app.use(cors(
+  {
+    origin: "http://localhost:5173", 
     credentials: true,
-  })
-);
+  }
+));
 
 const clientTavily = tavily({ apiKey: process.env.API_KEY });
 const clientOpenRouter = new OpenAI({
@@ -118,10 +116,8 @@ app.get("/Athena/conversation/:id", middleware, async (req, res) => {
       });
     }
 
-    // find conversation
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: conversationId,
         userId: user.id
       },
 
