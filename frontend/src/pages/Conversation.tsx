@@ -17,6 +17,8 @@ type Message = {
   followUps?: string[];
 };
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const Conversation = () => {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -29,7 +31,7 @@ const Conversation = () => {
 
   /*
     ==========================================
-    AUTH PROTECTION
+    AUTH CHECK
     ==========================================
   */
 
@@ -39,7 +41,6 @@ const Conversation = () => {
         data: { session },
       } = await superbase.auth.getSession();
 
-      // NOT LOGGED IN
       if (!session) {
         navigate("/auth");
         return;
@@ -50,7 +51,6 @@ const Conversation = () => {
 
     checkUser();
 
-    // REALTIME AUTH LISTENER
     const {
       data: { subscription },
     } = superbase.auth.onAuthStateChange(
@@ -61,7 +61,9 @@ const Conversation = () => {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   /*
@@ -124,21 +126,24 @@ const Conversation = () => {
 
   /*
     ==========================================
-    ASK AI
+    ASK ATHENA
     ==========================================
   */
 
   async function askAthena(query: string) {
     if (!query.trim() || loading) return;
 
+    const cleanQuery = query.trim();
+
     setLoading(true);
 
-    const userMessage: Message = {
-      role: "user",
-      content: query,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: cleanQuery,
+      },
+    ]);
 
     try {
       const {
@@ -153,7 +158,7 @@ const Conversation = () => {
       }
 
       const res = await fetch(
-        "http://localhost:3001/ask-Athena",
+        `${API_URL}/ask-Athena`,
         {
           method: "POST",
           headers: {
@@ -161,10 +166,14 @@ const Conversation = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            query,
+            query: cleanQuery,
           }),
         }
       );
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch response");
+      }
 
       const data = await res.json();
 
@@ -183,7 +192,19 @@ const Conversation = () => {
         },
       ]);
     } catch (err) {
-      console.error(err);
+      console.error("Athena Error:", err);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Something went wrong. Please try again.",
+          answer:
+            "Something went wrong. Please try again.",
+          followUps: [],
+        },
+      ]);
     } finally {
       setLoading(false);
       setInput("");
@@ -215,11 +236,11 @@ const Conversation = () => {
             rotate: 360,
           }}
           transition={{
-            duration: 1.2,
+            duration: 1,
             repeat: Infinity,
             ease: "linear",
           }}
-          className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full"
+          className="w-10 h-10 border-2 border-white/10 border-t-white rounded-full"
         />
       </div>
     );
@@ -230,7 +251,7 @@ const Conversation = () => {
       {/* SIDEBAR */}
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div
+          <motion.aside
             initial={{
               x: -280,
               opacity: 0,
@@ -244,7 +265,7 @@ const Conversation = () => {
               opacity: 0,
             }}
             transition={{
-              duration: 0.3,
+              duration: 0.25,
             }}
             className="
               w-[280px]
@@ -331,7 +352,7 @@ const Conversation = () => {
                 Logout
               </button>
             </div>
-          </motion.div>
+          </motion.aside>
         )}
       </AnimatePresence>
 
@@ -340,7 +361,9 @@ const Conversation = () => {
         {/* TOPBAR */}
         <div className="h-16 border-b border-white/5 bg-black/30 backdrop-blur-2xl px-5 flex items-center justify-between">
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() =>
+              setSidebarOpen(!sidebarOpen)
+            }
             className="w-10 h-10 rounded-xl hover:bg-white/5 flex items-center justify-center transition"
           >
             <Menu size={19} />
@@ -351,7 +374,7 @@ const Conversation = () => {
           </h1>
 
           <div className="text-sm text-white/30">
-             Workspace
+            Workspace
           </div>
         </div>
 
@@ -374,8 +397,9 @@ const Conversation = () => {
                 </h1>
 
                 <p className="mt-6 text-white/40 max-w-xl text-lg leading-relaxed">
-                  Ask questions, generate code, brainstorm
-                  ideas, and work faster with Athena AI.
+                  Ask questions, generate code,
+                  brainstorm ideas, and work faster
+                  with Athena AI.
                 </p>
               </motion.div>
             )}
@@ -427,28 +451,32 @@ const Conversation = () => {
                       </p>
 
                       {/* FOLLOW UPS */}
-                      {m.followUps?.length > 0 && (
+                      {m.followUps?.length ? (
                         <div className="flex flex-wrap gap-2 mt-5">
-                          {m.followUps.map((f, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => askAthena(f)}
-                              className="
-                                px-4
-                                py-2
-                                rounded-full
-                                bg-white/5
-                                hover:bg-white
-                                hover:text-black
-                                text-sm
-                                transition
-                              "
-                            >
-                              {f}
-                            </button>
-                          ))}
+                          {m.followUps?.map(
+                            (f, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() =>
+                                  askAthena(f)
+                                }
+                                className="
+                                  px-4
+                                  py-2
+                                  rounded-full
+                                  bg-white/5
+                                  hover:bg-white
+                                  hover:text-black
+                                  text-sm
+                                  transition
+                                "
+                              >
+                                {f}
+                              </button>
+                            )
+                          )}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </motion.div>
                 ))}
@@ -508,11 +536,13 @@ const Conversation = () => {
               />
 
               <motion.button
+                type="submit"
+                disabled={loading}
                 whileHover={{
-                  scale: 1.05,
+                  scale: loading ? 1 : 1.05,
                 }}
                 whileTap={{
-                  scale: 0.95,
+                  scale: loading ? 1 : 0.95,
                 }}
                 className="
                   w-11
@@ -523,6 +553,7 @@ const Conversation = () => {
                   flex
                   items-center
                   justify-center
+                  disabled:opacity-50
                 "
               >
                 <ArrowUp size={18} />
