@@ -10,8 +10,14 @@ import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt.js";
 import { prisma } from "./db/index.js";
 dotenv.config();
 
-if ( !process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
-  throw new Error(" Missing environment variables");
+console.log({
+  OPEN_ROUTER_API: process.env.OPEN_ROUTER_API ? "YES" : "NO",
+  API_KEY: process.env.API_KEY ? "YES" : "NO",
+  DATABASE_URL: process.env.DATABASE_URL ? "YES" : "NO",
+});
+
+if (!process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
+  throw new Error("Missing environment variables");
 }
 
 const app = express();
