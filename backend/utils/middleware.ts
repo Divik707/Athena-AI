@@ -1,7 +1,7 @@
 import type { NextFunction } from "express";
 import { createClient } from '@supabase/supabase-js'
 import type { Request, Response} from "express";
-import { prisma } from "../db";
+import { prisma } from "../db/index.js";
 
 const superbase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_PUBLISHABLE_KEY!);
 

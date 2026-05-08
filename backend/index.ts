@@ -4,10 +4,10 @@ import { tavily } from "@tavily/core";
 import { z } from "zod";
 import OpenAI from "openai";
 import dotenv from "dotenv";
-import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt";
-import { prisma } from "./db";
-import middleware from "./utils/middleware";
 import cors from "cors";
+import middleware from "./utils/middleware.js";
+import { prisma } from "./db/index.js";
+import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt.js";
 
 dotenv.config();
 
@@ -186,7 +186,7 @@ app.post("/ask-Athena/follow-on", middleware, async (req, res) => {
       });
     }
 
-    const history = conversation.messages.map((msg) => ({
+    const history = conversation.messages.map((msg:any) => ({
       role: msg.role === "User" ? "user" : "assistant",
       content: msg.content,
     }));
