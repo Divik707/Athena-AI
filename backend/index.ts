@@ -10,7 +10,7 @@ import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt.js";
 import { prisma } from "./db/index.js";
 dotenv.config();
 
-if (!process.env.PORT || !process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
+if ( !process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
   throw new Error(" Missing environment variables");
 }
 
