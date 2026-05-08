@@ -1,28 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { superbase } from "../utils/superbase";
-import { useNavigate } from "react-router-dom";
 import {
+  ArrowUp,
   Menu,
   Plus,
   LogOut,
   Sparkles,
-  ArrowUp,
-  MessageSquare,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { superbase } from "../utils/superbase";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
   answer?: string;
   followUps?: string[];
-};
-
-type ConversationType = {
-  id: string;
-  title: string;
-  messages?: any[];
-  createdAt?: string;
 };
 
 const Conversation = () => {
@@ -32,45 +24,63 @@ const Conversation = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [conversations, setConversations] = useState<
-    ConversationType[]
-  >([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const loadConversations = async () => {
-    try {
+  /*
+    ==========================================
+    AUTH PROTECTION
+    ==========================================
+  */
+
+  useEffect(() => {
+    async function checkUser() {
       const {
         data: { session },
       } = await superbase.auth.getSession();
 
-      const token = session?.access_token;
+      // NOT LOGGED IN
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
 
-      const res = await fetch(
-        "http://localhost:3001/Athena/conversations",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await res.json();
-
-      setConversations(data.conversations || []);
-    } catch (err) {
-      console.error(err);
+      setCheckingAuth(false);
     }
-  };
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
+    checkUser();
+
+    // REALTIME AUTH LISTENER
+    const {
+      data: { subscription },
+    } = superbase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!session) {
+          navigate("/auth");
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  /*
+    ==========================================
+    AUTO SCROLL
+    ==========================================
+  */
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
   }, [messages, loading]);
+
+  /*
+    ==========================================
+    RESPONSE PARSER
+    ==========================================
+  */
 
   function parseAthenaResponse(xmlString: string) {
     try {
@@ -100,7 +110,10 @@ const Conversation = () => {
         }
       }
 
-      return { answer, followUps };
+      return {
+        answer,
+        followUps,
+      };
     } catch {
       return {
         answer: xmlString,
@@ -109,8 +122,14 @@ const Conversation = () => {
     }
   }
 
+  /*
+    ==========================================
+    ASK AI
+    ==========================================
+  */
+
   async function askAthena(query: string) {
-    if (!query.trim()) return;
+    if (!query.trim() || loading) return;
 
     setLoading(true);
 
@@ -128,6 +147,11 @@ const Conversation = () => {
 
       const token = session?.access_token;
 
+      if (!token) {
+        navigate("/auth");
+        return;
+      }
+
       const res = await fetch(
         "http://localhost:3001/ask-Athena",
         {
@@ -136,7 +160,9 @@ const Conversation = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({
+            query,
+          }),
         }
       );
 
@@ -156,80 +182,57 @@ const Conversation = () => {
           followUps,
         },
       ]);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
       setInput("");
     }
   }
 
-  const handleLogout = async () => {
+  /*
+    ==========================================
+    LOGOUT
+    ==========================================
+  */
+
+  async function handleLogout() {
     await superbase.auth.signOut();
-    navigate("/");
-  };
+    navigate("/auth");
+  }
+
+  /*
+    ==========================================
+    LOADING SCREEN
+    ==========================================
+  */
+
+  if (checkingAuth) {
+    return (
+      <div className="h-screen bg-[#0D0D0D] flex items-center justify-center">
+        <motion.div
+          animate={{
+            rotate: 360,
+          }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full"
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen bg-[#f7f7f8] text-black flex overflow-hidden relative">
-
-      {/* BACKGROUND */}
-      <div className="absolute inset-0 overflow-hidden">
-
-        <motion.div
-          animate={{
-            x: [0, 60, 0],
-            y: [0, -40, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-200/50 rounded-full blur-[120px]"
-        />
-
-        <motion.div
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 60, 0],
-            scale: [1.1, 0.95, 1.1],
-          }}
-          transition={{
-            duration: 22,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-200/50 rounded-full blur-[140px]"
-        />
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_50%)]" />
-      </div>
-
-      {/* FLOATING PARTICLES */}
-      {[...Array(15)].map((_, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0.2, 0.6, 0.2],
-          }}
-          transition={{
-            duration: 4 + i,
-            repeat: Infinity,
-          }}
-          className="absolute w-1 h-1 bg-black/10 rounded-full"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-          }}
-        />
-      ))}
-
+    <div className="h-screen bg-[#0D0D0D] text-white flex overflow-hidden">
       {/* SIDEBAR */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             initial={{
-              x: -320,
+              x: -280,
               opacity: 0,
             }}
             animate={{
@@ -237,69 +240,41 @@ const Conversation = () => {
               opacity: 1,
             }}
             exit={{
-              x: -320,
+              x: -280,
               opacity: 0,
             }}
             transition={{
-              duration: 0.4,
+              duration: 0.3,
             }}
             className="
-              w-[300px]
-              bg-white/70
-              backdrop-blur-3xl
+              w-[280px]
+              bg-black/40
+              backdrop-blur-2xl
               border-r
-              border-black/5
+              border-white/5
               flex
               flex-col
-              z-20
-              shadow-[0_10px_50px_rgba(0,0,0,0.05)]
             "
           >
-            {/* Logo */}
-            <div className="px-6 py-6 border-b border-black/5">
-
+            {/* LOGO */}
+            <div className="p-5 border-b border-white/5">
               <div className="flex items-center gap-3">
-
-                <div
-                  className="
-                  w-12
-                  h-12
-                  rounded-2xl
-                  bg-gradient-to-br
-                  from-blue-500
-                  to-purple-500
-                  text-white
-                  flex
-                  items-center
-                  justify-center
-                  shadow-lg
-                "
-                >
+                <div className="w-11 h-11 rounded-2xl bg-white text-black flex items-center justify-center">
                   <Sparkles size={18} />
                 </div>
 
                 <div>
-                  <h1
-                    className="
-                    text-xl
-                    font-semibold
-                    tracking-tight
-                    bg-gradient-to-r
-                    from-black
-                    to-gray-500
-                    text-transparent
-                    bg-clip-text
-                  "
-                  >
+                  <h1 className="font-semibold text-lg">
                     Athena
                   </h1>
 
-                  <p className="text-sm text-black/40">
-                    At your service
+                  <p className="text-sm text-white/35">
+                    AI Workspace
                   </p>
                 </div>
               </div>
 
+              {/* NEW CHAT */}
               <button
                 onClick={() => setMessages([])}
                 className="
@@ -307,19 +282,15 @@ const Conversation = () => {
                   w-full
                   h-12
                   rounded-2xl
-                  bg-gradient-to-r
-                  from-blue-500
-                  to-purple-500
-                  text-white
-                  font-medium
+                  bg-white
+                  text-black
                   flex
                   items-center
                   justify-center
                   gap-2
-                  shadow-lg
+                  font-medium
                   hover:scale-[1.02]
-                  transition-all
-                  duration-300
+                  transition
                 "
               >
                 <Plus size={18} />
@@ -327,69 +298,33 @@ const Conversation = () => {
               </button>
             </div>
 
-            {/* Conversations */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
-              {conversations.map((c) => (
-                <motion.div
-                  whileHover={{
-                    scale: 1.02,
-                  }}
-                  whileTap={{
-                    scale: 0.98,
-                  }}
-                  key={c.id}
-                  className="
-                    group
-                    p-4
-                    rounded-3xl
-                    bg-white/60
-                    hover:bg-white
-                    border
-                    border-black/5
-                    transition-all
-                    duration-300
-                    cursor-pointer
-                    hover:shadow-lg
-                  "
-                >
-                  <div className="flex items-start gap-3">
-
-                    <div className="mt-1 text-blue-500">
-                      <MessageSquare size={16} />
-                    </div>
-
-                    <div>
-                      <h2 className="font-medium text-sm text-black line-clamp-1">
-                        {c.title}
-                      </h2>
-
-                      <p className="text-xs text-black/40 mt-1">
-                        Conversation
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+            {/* SIDEBAR CONTENT */}
+            <div className="flex-1 p-4 overflow-y-auto">
+              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Your conversations will appear here.
+                </p>
+              </div>
             </div>
 
-            {/* Logout */}
-            <div className="p-4 border-t border-black/5">
+            {/* LOGOUT */}
+            <div className="p-4 border-t border-white/5">
               <button
                 onClick={handleLogout}
                 className="
                   w-full
                   h-12
                   rounded-2xl
-                  bg-red-50
-                  text-red-500
                   border
-                  border-red-100
+                  border-red-500/10
+                  bg-red-500/10
+                  text-red-400
                   flex
                   items-center
                   justify-center
                   gap-2
-                  hover:bg-red-100
-                  transition-all
+                  hover:bg-red-500/20
+                  transition
                 "
               >
                 <LogOut size={17} />
@@ -401,64 +336,28 @@ const Conversation = () => {
       </AnimatePresence>
 
       {/* MAIN */}
-      <div className="flex-1 flex flex-col relative z-10">
-
+      <div className="flex-1 flex flex-col">
         {/* TOPBAR */}
-        <div
-          className="
-            h-16
-            px-6
-            bg-white/60
-            backdrop-blur-3xl
-            border-b
-            border-black/5
-            flex
-            items-center
-            justify-between
-          "
-        >
+        <div className="h-16 border-b border-white/5 bg-black/30 backdrop-blur-2xl px-5 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-11 h-11 rounded-xl hover:bg-black/5 flex items-center justify-center transition"
+            className="w-10 h-10 rounded-xl hover:bg-white/5 flex items-center justify-center transition"
           >
-            <Menu size={20} />
+            <Menu size={19} />
           </button>
 
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: -8,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-          >
-            <h1
-              className="
-                text-lg
-                font-semibold
-                bg-gradient-to-r
-                from-black
-                via-gray-700
-                to-gray-400
-                text-transparent
-                bg-clip-text
-              "
-            >
-              Athena AI
-            </h1>
-          </motion.div>
+          <h1 className="font-medium text-white/80">
+            Athena
+          </h1>
 
-          <div className="text-xs text-black/40 font-medium">
-            Minimal Intelligence
+          <div className="text-sm text-white/30">
+             Workspace
           </div>
         </div>
 
         {/* CHAT */}
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="max-w-4xl mx-auto">
-
             {/* EMPTY */}
             {messages.length === 0 && (
               <motion.div
@@ -468,37 +367,15 @@ const Conversation = () => {
                 animate={{
                   opacity: 1,
                 }}
-                className="h-[70vh] flex flex-col items-center justify-center text-center"
+                className="h-[75vh] flex flex-col items-center justify-center text-center"
               >
-                <motion.h1
-                  initial={{
-                    y: 20,
-                  }}
-                  animate={{
-                    y: 0,
-                  }}
-                  transition={{
-                    duration: 0.5,
-                  }}
-                  className="
-                    text-7xl
-                    md:text-8xl
-                    font-semibold
-                    tracking-[-0.06em]
-                    leading-none
-                    bg-gradient-to-b
-                    from-black
-                    to-gray-400
-                    text-transparent
-                    bg-clip-text
-                  "
-                >
-                  Ask anything.
-                </motion.h1>
+                <h1 className="text-6xl md:text-7xl font-semibold tracking-tight">
+                  How can I help you?
+                </h1>
 
-                <p className="mt-6 text-lg text-black/45 max-w-xl leading-relaxed">
-                  Beautiful AI conversations with Apple inspired
-                  design and fluid interactions.
+                <p className="mt-6 text-white/40 max-w-xl text-lg leading-relaxed">
+                  Ask questions, generate code, brainstorm
+                  ideas, and work faster with Athena AI.
                 </p>
               </motion.div>
             )}
@@ -511,18 +388,14 @@ const Conversation = () => {
                     key={i}
                     initial={{
                       opacity: 0,
-                      y: 40,
-                      scale: 0.96,
-                      filter: "blur(10px)",
+                      y: 30,
                     }}
                     animate={{
                       opacity: 1,
                       y: 0,
-                      scale: 1,
-                      filter: "blur(0px)",
                     }}
                     transition={{
-                      duration: 0.35,
+                      duration: 0.25,
                     }}
                     className={`flex ${
                       m.role === "user"
@@ -531,62 +404,48 @@ const Conversation = () => {
                     }`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-[30px] px-6 py-5 border text-[15px] leading-8 tracking-[0.01em]
+                      className={`max-w-[85%] rounded-[28px] px-6 py-5 text-[15px] leading-8
                       ${
                         m.role === "user"
                           ? `
-                            bg-gradient-to-r
-                            from-blue-500
-                            to-purple-500
-                            text-white
-                            border-transparent
-                            shadow-lg
+                            bg-white
+                            text-black
                           `
                           : `
-                            bg-white/70
-                            backdrop-blur-3xl
-                            border-black/5
-                            text-black
-                            shadow-[0_10px_40px_rgba(0,0,0,0.04)]
+                            bg-white/[0.04]
+                            border
+                            border-white/5
+                            backdrop-blur-xl
+                            text-white
                           `
                       }`}
                     >
-                      <p className="whitespace-pre-wrap font-medium">
+                      <p className="whitespace-pre-wrap">
                         {m.role === "assistant"
                           ? m.answer
                           : m.content}
                       </p>
 
-                      {/* FOLLOWUPS */}
+                      {/* FOLLOW UPS */}
                       {m.followUps?.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-5">
                           {m.followUps.map((f, idx) => (
-                            <motion.button
-                              whileHover={{
-                                scale: 1.04,
-                              }}
-                              whileTap={{
-                                scale: 0.96,
-                              }}
+                            <button
                               key={idx}
                               onClick={() => askAthena(f)}
                               className="
                                 px-4
                                 py-2
                                 rounded-full
-                                bg-black/5
-                                hover:bg-gradient-to-r
-                                hover:from-blue-500
-                                hover:to-purple-500
-                                hover:text-white
-                                text-black
+                                bg-white/5
+                                hover:bg-white
+                                hover:text-black
                                 text-sm
-                                transition-all
-                                duration-300
+                                transition
                               "
                             >
                               {f}
-                            </motion.button>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -597,16 +456,8 @@ const Conversation = () => {
 
               {/* LOADING */}
               {loading && (
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                  }}
-                  className="flex justify-start"
-                >
-                  <div className="bg-white/80 border border-black/5 rounded-full px-6 py-4 flex gap-2 backdrop-blur-2xl shadow-lg">
+                <div className="flex justify-start">
+                  <div className="bg-white/[0.04] border border-white/5 rounded-full px-5 py-4 flex gap-2">
                     {[0, 1, 2].map((i) => (
                       <motion.div
                         key={i}
@@ -616,13 +467,13 @@ const Conversation = () => {
                         transition={{
                           duration: 0.6,
                           repeat: Infinity,
-                          delay: i * 0.15,
+                          delay: i * 0.12,
                         }}
-                        className="w-2 h-2 bg-blue-500 rounded-full"
+                        className="w-2 h-2 bg-white rounded-full"
                       />
                     ))}
                   </div>
-                </motion.div>
+                </div>
               )}
 
               <div ref={messagesEndRef} />
@@ -631,7 +482,7 @@ const Conversation = () => {
         </div>
 
         {/* INPUT */}
-        <div className="p-6 border-t border-black/5 bg-white/60 backdrop-blur-3xl">
+        <div className="p-6 border-t border-white/5 bg-black/20 backdrop-blur-2xl">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -639,25 +490,7 @@ const Conversation = () => {
             }}
             className="max-w-4xl mx-auto"
           >
-            <div
-              className="
-                relative
-                flex
-                items-center
-                bg-white/80
-                border
-                border-black/5
-                rounded-[30px]
-                backdrop-blur-3xl
-                shadow-[0_10px_40px_rgba(0,0,0,0.05)]
-                px-3
-                py-3
-                transition-all
-                duration-500
-                focus-within:border-blue-300
-                focus-within:shadow-[0_10px_50px_rgba(59,130,246,0.15)]
-              "
-            >
+            <div className="flex items-center gap-3 rounded-[28px] border border-white/10 bg-white/[0.03] px-4 py-3">
               <input
                 value={input}
                 onChange={(e) =>
@@ -668,11 +501,9 @@ const Conversation = () => {
                   flex-1
                   bg-transparent
                   outline-none
-                  px-4
                   text-[15px]
-                  font-medium
-                  text-black
-                  placeholder:text-black/35
+                  text-white
+                  placeholder:text-white/30
                 "
               />
 
@@ -684,19 +515,14 @@ const Conversation = () => {
                   scale: 0.95,
                 }}
                 className="
-                  w-12
-                  h-12
+                  w-11
+                  h-11
                   rounded-2xl
-                  bg-gradient-to-r
-                  from-blue-500
-                  to-purple-500
-                  text-white
+                  bg-white
+                  text-black
                   flex
                   items-center
                   justify-center
-                  shadow-lg
-                  transition-all
-                  duration-300
                 "
               >
                 <ArrowUp size={18} />
