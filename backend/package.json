@@ -3,6 +3,13 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  
+    "scripts": {
+      "dev": "bun index.ts",
+      "build": "tsc",
+      "start": "node dist/index.js"
+    }
+  ,
   "devDependencies": {
     "@types/bun": "latest"
   },
