@@ -11,21 +11,15 @@ import { fileURLToPath } from "url";
 import path from "path";
 import dotenv from "dotenv";
 
-/* =========================
-   FIXED PATH (ESM SAFE)
-========================= */
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* LOAD ENV FROM ROOT */
 dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
 
-/* =========================
-   ENV CHECK
-========================= */
 
 console.log("ENV DEBUG RAW:", {
   OPEN_ROUTER_API: process.env.OPEN_ROUTER_API ? "YES" : "NO",
@@ -37,10 +31,6 @@ if (!process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
   throw new Error("Missing environment variables");
 }
 
-/* =========================
-   APP SETUP
-========================= */
-
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -48,14 +38,10 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://your-app.vercel.app"],
+    origin: ["http://localhost:5173", "https://athena-ai-neon.vercel.app"],
     credentials: true,
   })
 );
-
-/* =========================
-   CLIENTS
-========================= */
 
 const clientTavily = tavily({
   apiKey: process.env.API_KEY as string,
@@ -66,17 +52,10 @@ const clientOpenRouter = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-/* =========================
-   VALIDATION
-========================= */
 
 const userInputQuery = z.object({
   query: z.string().min(2).max(200),
-});
-
-/* =========================
-   HELPERS
-========================= */
+})
 
 function formatContext(results: any[]) {
   return results.slice(0, 5).map((r) => ({
@@ -86,9 +65,7 @@ function formatContext(results: any[]) {
   }));
 }
 
-/* =========================
-   ROUTES
-========================= */
+
 
 app.post("/ask-Athena", middleware, async (req: Request, res: Response) => {
   try {
@@ -147,10 +124,6 @@ app.post("/ask-Athena", middleware, async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-
-/* =========================
-   START SERVER
-========================= */
 
 async function startServer() {
   try {
