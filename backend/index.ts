@@ -40,6 +40,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
+      "https://athena-ai-neon.vercel.app",
       "https://athena-ai-git-main-diviks-projects-0f94f873.vercel.app",
       "athena-ai-git-main-diviks-projects-0f94f873.vercel.app"
     ],
