@@ -3,14 +3,31 @@ import type { Request, Response } from "express";
 import { tavily } from "@tavily/core";
 import { z } from "zod";
 import OpenAI from "openai";
-import dotenv from "dotenv";
 import cors from "cors";
 import middleware from "./utils/middleware.js";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "./prompt.js";
 import { prisma } from "./db/index.js";
-dotenv.config();
+import { fileURLToPath } from "url";
+import path from "path";
+import dotenv from "dotenv";
 
-console.log({
+/* =========================
+   FIXED PATH (ESM SAFE)
+========================= */
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/* LOAD ENV FROM ROOT */
+dotenv.config({
+  path: path.resolve(__dirname, "../.env"),
+});
+
+/* =========================
+   ENV CHECK
+========================= */
+
+console.log("ENV DEBUG RAW:", {
   OPEN_ROUTER_API: process.env.OPEN_ROUTER_API ? "YES" : "NO",
   API_KEY: process.env.API_KEY ? "YES" : "NO",
   DATABASE_URL: process.env.DATABASE_URL ? "YES" : "NO",
@@ -20,57 +37,71 @@ if (!process.env.OPEN_ROUTER_API || !process.env.API_KEY) {
   throw new Error("Missing environment variables");
 }
 
+/* =========================
+   APP SETUP
+========================= */
+
 const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(express.json());
-app.use(cors(
-  {
-    origin: [
-      "http://localhost:5173",
-      "https://your-app.vercel.app",
-    ],
-    credentials: true,
-  }
-));
 
-const clientTavily = tavily({ apiKey: process.env.API_KEY });
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://your-app.vercel.app"],
+    credentials: true,
+  })
+);
+
+/* =========================
+   CLIENTS
+========================= */
+
+const clientTavily = tavily({
+  apiKey: process.env.API_KEY as string,
+});
+
 const clientOpenRouter = new OpenAI({
-  apiKey: process.env.OPEN_ROUTER_API,
+  apiKey: process.env.OPEN_ROUTER_API as string,
   baseURL: "https://openrouter.ai/api/v1",
 });
 
+/* =========================
+   VALIDATION
+========================= */
+
 const userInputQuery = z.object({
-  query: z.string().min(2).max(200, {message: "under 200 words"}),
+  query: z.string().min(2).max(200),
 });
 
+/* =========================
+   HELPERS
+========================= */
+
 function formatContext(results: any[]) {
-  return results
-    .slice(0, 5) 
-    .map((r) => ({
-      title: r.title,
-      content: r.content?.slice(0, 500), 
-      url: r.url,
-    }));
+  return results.slice(0, 5).map((r) => ({
+    title: r.title,
+    content: r.content?.slice(0, 500),
+    url: r.url,
+  }));
 }
 
+/* =========================
+   ROUTES
+========================= */
 
-  
-
-app.post("/ask-Athena", middleware,  async (req: Request, res: Response) => {
+app.post("/ask-Athena", middleware, async (req: Request, res: Response) => {
   try {
-    const convo = userInputQuery.safeParse(req.body);
+    const parsed = userInputQuery.safeParse(req.body);
 
-    if (!convo.success) {
-      return res.status(400).json({
-        message: "Invalid input",
-        error: convo.error.format(),
-      });
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid input" });
     }
 
-    const query = convo.data.query;
+    const query = parsed.data.query;
 
-    let web_results: any = [];
+    let web_results: any[] = [];
+
     try {
       const response = await clientTavily.search(query, {
         searchDepth: "advanced",
@@ -81,20 +112,21 @@ app.post("/ask-Athena", middleware,  async (req: Request, res: Response) => {
       console.error("Tavily error:", err);
     }
 
-    const prompt = PROMPT_TEMPLATE
-      .replace("{{CONTEXT}}", JSON.stringify(web_results, null, 2))
-      .replace("{{USER_QUERY}}", query);
+    const prompt = PROMPT_TEMPLATE.replace(
+      "{{CONTEXT}}",
+      JSON.stringify(web_results, null, 2)
+    ).replace("{{USER_QUERY}}", query);
 
     const llmResponse = await clientOpenRouter.chat.completions.create({
       model: "meta-llama/llama-3-8b-instruct",
-      temperature: 0.3, 
+      temperature: 0.3,
       max_tokens: 800,
       messages: [
         {
           role: "system",
           content:
             SYSTEM_PROMPT +
-            "\n\nSTRICT RULE: Output MUST be valid XML. No markdown, no extra text.",
+            "\n\nSTRICT RULE: Output MUST be valid XML.",
         },
         {
           role: "user",
@@ -103,151 +135,33 @@ app.post("/ask-Athena", middleware,  async (req: Request, res: Response) => {
       ],
     });
 
-    let finalOutput = llmResponse.choices[0]?.message?.content || "";
+    const finalOutput =
+      llmResponse.choices[0]?.message?.content?.trim() || "";
 
-    finalOutput = finalOutput.trim();
-
-    if (!finalOutput.includes("<ANSWER>")) {
-      finalOutput = `
-<ANSWER>
-The model failed to generate a structured response. Please try rephrasing your query.
-</ANSWER>
-<FOLLOW_UPS>
-  <QUESTION>Can you provide more specific details?</QUESTION>
-  <QUESTION>What exact information are you looking for?</QUESTION>
-  <QUESTION>Can you simplify your query?</QUESTION>
-</FOLLOW_UPS>
-      `.trim();
-    }
-    res.json({
+    return res.json({
       data: finalOutput,
       context_used: web_results.length,
     });
-
   } catch (error) {
-    console.error("Server error:", error);
-
-    res.status(500).json({
-      message: "Internal server error",
-    });
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-const followOnSchema = z.object({
-  query: z.string().min(1),
-  conversationId: z.string(),
-});
+/* =========================
+   START SERVER
+========================= */
 
-app.post("/ask-Athena/follow-on", middleware, async (req, res) => {
+async function startServer() {
   try {
+    await prisma.$connect();
 
-    const parsed = followOnSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid input",
-      });
-    }
-    const { query, conversationId } = parsed.data;
-
-    const supabaseId = req.userId;
-
-    if (!supabaseId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
-
-    const currentUser = await prisma.users.findFirst({
-      where: {
-        superbaseId: supabaseId,
-      },
+    app.listen(port, () => {
+      console.log(`Athena is live on port ${port}`);
     });
-
-    if (!currentUser) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: conversationId,
-        userId: currentUser.id,
-      },
-
-      include: {
-        messages: {
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
-    });
-
-    if (!conversation) {
-      return res.status(404).json({
-        message: "Conversation not found",
-      });
-    }
-
-    const history = conversation.messages.map((msg:any) => ({
-      role: msg.role === "User" ? "user" : "assistant",
-      content: msg.content,
-    }));
-
-    history.push({
-      role: "user",
-      content: query,
-    });
-
-    const llmResponse = await clientOpenRouter.chat.completions.create({
-      model: "meta-llama/llama-3-8b-instruct",
-
-      temperature: 0.3,
-
-      messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-      ],
-    });
-
-    const answer =
-      llmResponse.choices[0]?.message?.content ||
-      "No response generated.";
-
-    await prisma.messages.create({
-      data: {
-        content: query,
-        role: "User",
-        conversationId: conversation.id,
-      },
-    });
-
-    await prisma.messages.create({
-      data: {
-        content: answer,
-        role: "Assistant",
-        conversationId: conversation.id,
-      },
-    });
-
-    return res.status(200).json({
-      answer,
-    });
-
   } catch (err) {
-
-    console.log(err);
-
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    console.error(err);
   }
-});
+}
 
-app.listen(port, () => {
-  console.log(` Athena is live at http://localhost:${port}`);
-});
+startServer();
