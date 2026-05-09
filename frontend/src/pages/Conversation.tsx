@@ -17,7 +17,7 @@ type Message = {
   followUps?: string[];
 };
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "https://athena-ai-4.onrender.com"
 
 const Conversation = () => {
   const navigate = useNavigate();
