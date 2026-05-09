@@ -41,7 +41,6 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://athena-ai-neon.vercel.app",
-      "https://athena-kwwp8k8zy-diviks-projects-0f94f873.vercel.app"
     ],
     credentials: true,
   })
